@@ -19,4 +19,8 @@ app.get("/", (req, res) => {
   res.send("Welcome to the Kanban App Backend!");
 });
 
+// Import routes
+import userRoutes from "./routes/user.route.js";
+app.use("/api/auth", userRoutes);
+
 export default app;
