@@ -1,6 +1,7 @@
 import { validationResult } from "express-validator";
 import { Task } from "../models/task.model.js";
 import mongoose from "mongoose";
+import { getIo } from "../socket.js";
 
 export const createTask = async (req, res) => {
   const errors = validationResult(req);
@@ -20,6 +21,9 @@ export const createTask = async (req, res) => {
     });
 
     const savedTask = await task.save();
+
+    const io = getIo();
+    io.emit("task_created", savedTask);
 
     res.status(201).json({
       message: "Task created successfully",
@@ -85,6 +89,8 @@ export const updateTask = async (req, res) => {
     if (assignedTo !== undefined) task.assignedTo = assignedTo;
 
     const updatedTask = await task.save();
+    const io = getIo();
+    io.emit("task_updated", updatedTask);
     res.status(200).json({
       message: "Task updated successfully",
       updatedTask,
@@ -104,6 +110,9 @@ export const deleteTask = async (req, res) => {
       return res.status(404).json({ message: "Task not found" });
     }
     await task.deleteOne();
+
+    const io = getIo();
+    io.emit("task_deleted", task._id);
     res.status(200).json({ message: "Task deleted successfully" });
   } catch (error) {
     console.error("Error deleting task:", error);
