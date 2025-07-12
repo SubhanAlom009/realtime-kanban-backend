@@ -21,6 +21,8 @@ app.get("/", (req, res) => {
 
 // Import routes
 import userRoutes from "./routes/user.route.js";
+import taskRoutes from "./routes/task.route.js";
 app.use("/api/auth", userRoutes);
+app.use("/api", taskRoutes);
 
 export default app;

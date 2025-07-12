@@ -1,3 +1,5 @@
+import mongoose from "mongoose";
+
 const taskSchema = new mongoose.Schema(
   {
     title: {
@@ -6,12 +8,11 @@ const taskSchema = new mongoose.Schema(
     },
     description: {
       type: String,
-      required: true,
     },
     assignedTo: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
+      default: null, // ✅ Optional
     },
     status: {
       type: String,
@@ -30,3 +31,5 @@ const taskSchema = new mongoose.Schema(
   },
   { Timestamps: true }
 );
+
+export const Task = mongoose.model("Task", taskSchema);
