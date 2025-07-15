@@ -22,7 +22,7 @@ const actionlogSchema = new mongoose.Schema(
       required: false, // Optional field for additional details
     },
   },
-  { Timestamps: true }
+  { timestamps: true }
 );
 
 export const ActionLog = mongoose.model("ActionLog", actionlogSchema);

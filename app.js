@@ -22,7 +22,10 @@ app.get("/", (req, res) => {
 // Import routes
 import userRoutes from "./routes/user.route.js";
 import taskRoutes from "./routes/task.route.js";
+import logRoutes from "./routes/log.route.js";
+
 app.use("/api/auth", userRoutes);
 app.use("/api", taskRoutes);
+app.use("/api/logs", logRoutes);
 
 export default app;
