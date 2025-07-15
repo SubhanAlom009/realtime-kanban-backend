@@ -44,7 +44,10 @@ router.put(
       .optional()
       .isIn(["todo", "in-progress", "done"])
       .withMessage("Invalid status value"),
-    body("assignedTo").optional().isMongoId().withMessage("Invalid user ID"),
+    body("assignedTo")
+      .optional({ nullable: true, checkFalsy: true })
+      .isMongoId()
+      .withMessage("Invalid user ID"),
   ],
   updateTask
 );

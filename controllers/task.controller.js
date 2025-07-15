@@ -3,6 +3,7 @@ import { Task } from "../models/task.model.js";
 import mongoose from "mongoose";
 import { getIo } from "../socket.js";
 import { logAction } from "../utils/logActions.js";
+import { findLeastLoadedUser } from "../utils/smartAssign.js";
 
 export const createTask = async (req, res) => {
   const errors = validationResult(req);
@@ -13,20 +14,41 @@ export const createTask = async (req, res) => {
   try {
     const { title, description, assignedTo, priority, status } = req.body;
 
-    const task = new Task({ title, description, assignedTo, priority, status });
+    let assignedUser = assignedTo;
+    let leastUser = null;
+
+    // Smart assign if no user provided
+    if (!assignedTo) {
+      leastUser = await findLeastLoadedUser();
+      if (leastUser) assignedUser = leastUser._id;
+    }
+
+    const task = new Task({
+      title,
+      description,
+      assignedTo: assignedUser,
+      priority,
+      status,
+    });
+
     const savedTask = await task.save();
 
     await logAction({
       action: "add",
       taskId: savedTask._id,
       performedBy: req.user._id,
-      details: `Created task "${savedTask.title}" in ${savedTask.status}`,
+      details: assignedTo
+        ? `Created task "${savedTask.title}" in ${savedTask.status}`
+        : `Created and auto-assigned "${savedTask.title}" to ${leastUser.username}`,
     });
 
     const io = getIo();
     io.emit("task_created", savedTask);
 
-    res.status(201).json({ message: "Task created successfully", savedTask });
+    res.status(201).json({
+      message: "Task created successfully",
+      savedTask,
+    });
   } catch (error) {
     console.error("Error creating task:", error);
     return res.status(500).json({ message: "Internal server error" });
