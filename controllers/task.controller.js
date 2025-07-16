@@ -101,6 +101,33 @@ export const updateTask = async (req, res) => {
       return res.status(404).json({ message: "Task not found" });
     }
 
+    // 🟡 Step 1: Conflict Detection BEFORE updating
+    const clientTimestamp = req.body.lastModified;
+
+    // Only check for conflicts if client provides a timestamp
+    if (clientTimestamp && !isNaN(new Date(clientTimestamp).getTime())) {
+      const serverTime = new Date(task.lastModified).getTime();
+      const clientTime = new Date(clientTimestamp).getTime();
+      const timeDifference = serverTime - clientTime;
+
+      console.log("Time difference (ms):", timeDifference);
+
+      // Compare with a small tolerance (500ms) to account for slight time differences
+      if (timeDifference > 500) {
+        console.log(
+          "⚠️ CONFLICT DETECTED - timestamps differ by",
+          timeDifference,
+          "ms"
+        );
+        return res.status(409).json({
+          message: "Conflict: Task has been modified by another user.",
+          currentTask: task,
+          yourAttempt: req.body,
+        });
+      }
+    }
+
+    // 🟢 Step 2: Update Fields
     const oldStatus = task.status;
     const { title, description, assignedTo, priority, status } = req.body;
 
@@ -108,10 +135,34 @@ export const updateTask = async (req, res) => {
     if (description !== undefined) task.description = description;
     if (priority !== undefined) task.priority = priority;
     if (status !== undefined) task.status = status;
-    if (assignedTo !== undefined) task.assignedTo = assignedTo;
+
+    // Smart assign if assignedTo is explicitly null
+    if (assignedTo === null) {
+      const leastUser = await findLeastLoadedUser();
+      if (leastUser) {
+        task.assignedTo = leastUser._id;
+      } else {
+        task.assignedTo = null;
+      }
+    } else if (assignedTo !== undefined) {
+      task.assignedTo = assignedTo === "" ? null : assignedTo;
+    }
+
+    // Update lastModified timestamp explicitly
+    task.lastModified = new Date();
 
     const updatedTask = await task.save();
+    // Inside updateTask controller
+    console.log("Client timestamp:", clientTimestamp);
+    console.log("Server timestamp:", task.lastModified);
+    console.log("Parsed client date:", new Date(clientTimestamp));
+    console.log("Parsed server date:", new Date(task.lastModified));
+    console.log(
+      "Comparison result:",
+      new Date(clientTimestamp) < new Date(task.lastModified)
+    );
 
+    // 📘 Log the action
     await logAction({
       action: oldStatus !== updatedTask.status ? "move" : "edit",
       taskId: updatedTask._id,
@@ -122,15 +173,16 @@ export const updateTask = async (req, res) => {
           : `Edited task "${updatedTask.title}"`,
     });
 
+    // 🔁 Notify via WebSocket
     const io = getIo();
     io.emit("task_updated", updatedTask);
 
-    res.status(200).json({
+    return res.status(200).json({
       message: "Task updated successfully",
       updatedTask,
     });
   } catch (error) {
-    console.error("Error updating task:", error);
+    console.error("❌ Error updating task:", error);
     return res.status(500).json({ message: "Internal server error" });
   }
 };
@@ -158,5 +210,51 @@ export const deleteTask = async (req, res) => {
   } catch (error) {
     console.error("Error deleting task:", error);
     return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const lockTask = async (req, res) => {
+  const { id } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ message: "Invalid Task ID" });
+  }
+
+  try {
+    const task = await Task.findById(id);
+    if (!task) return res.status(404).json({ message: "Task not found" });
+
+    task.isEditing = true;
+    await task.save();
+
+    const io = getIo();
+    io.emit("task_locked", { taskId: task._id });
+
+    res.status(200).json({ message: "Task locked for editing" });
+  } catch (err) {
+    console.error("Locking error:", err);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const unlockTask = async (req, res) => {
+  const { id } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ message: "Invalid Task ID" });
+  }
+
+  try {
+    const task = await Task.findById(id);
+    if (!task) return res.status(404).json({ message: "Task not found" });
+
+    task.isEditing = false;
+    await task.save();
+
+    const io = getIo();
+    io.emit("task_unlocked", { taskId: task._id });
+
+    res.status(200).json({ message: "Task unlocked" });
+  } catch (err) {
+    console.error("Unlocking error:", err);
+    res.status(500).json({ message: "Internal server error" });
   }
 };
