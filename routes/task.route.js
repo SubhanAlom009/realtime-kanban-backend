@@ -56,7 +56,4 @@ router.put(
 
 router.delete("/tasks/:id", authUser, deleteTask);
 
-router.put("/tasks/:id/lock", authUser, lockTask);
-router.put("/tasks/:id/unlock", authUser, unlockTask);
-
 export default router;
