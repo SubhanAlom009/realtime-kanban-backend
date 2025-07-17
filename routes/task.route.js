@@ -1,12 +1,10 @@
-import express, { Router } from "express";
+import { Router } from "express";
 import { authUser } from "../middleware/auth.middleware.js";
 import {
   createTask,
   deleteTask,
   getSingleTask,
   getTasks,
-  lockTask,
-  unlockTask,
   updateTask,
 } from "../controllers/task.controller.js";
 import { body } from "express-validator";
